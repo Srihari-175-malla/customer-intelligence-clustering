@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SegmentIQ - Customer Segmentation & Personalization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+  <div class="app-layout">
+    
+    <!-- Top Header -->
+    <header class="navbar">
+      <div class="logo-group">
+        <div class="logo-icon">🎯</div>
+        <div class="logo-title">Segment<span class="highlight">IQ</span> <span class="badge">RFM & Personalization Engine</span></div>
+      </div>
+      <nav class="nav-tabs">
+        <button class="nav-btn active" id="tab-btn-profiles" onclick="switchNavTab('profiles-view')">📊 Profiles & Marketing</button>
+        <button class="nav-btn" id="tab-btn-pca" onclick="switchNavTab('pca-view')">🌌 2D PCA Projection</button>
+        <button class="nav-btn" id="tab-btn-revenue" onclick="switchNavTab('revenue-view')">💰 Revenue Lift Simulation</button>
+        <button class="nav-btn" id="tab-btn-validation" onclick="switchNavTab('validation-view')">📈 Cluster Validation</button>
+      </nav>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Theme">🌙</button>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-view">
+
+      <!-- Control Toolbar -->
+      <div class="controls-card">
+        <div class="control-group">
+          <label>Clustering Algorithm:</label>
+          <select id="algo-select" onchange="runSegmentation()">
+            <option value="kmeans">K-Means++ (From Scratch)</option>
+            <option value="hierarchical">Hierarchical Agglomerative</option>
+            <option value="gmm">Gaussian Mixture Model (GMM EM)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Clusters (K): <strong id="k-val">4</strong></label>
+          <input type="range" id="k-slider" min="2" max="8" value="4" oninput="updateKValue()">
+        </div>
+
+        <button class="btn primary" id="segment-btn" onclick="runSegmentation()">⚡ Run Segmentation & Personalization</button>
+        <div id="sil-score-badge" class="score-badge">Silhouette Score: <strong>-</strong></div>
+      </div>
+
+      <!-- VIEW 1: SEGMENT PROFILES & PERSONALIZATION -->
+      <section id="profiles-view" class="view-content active">
+        <div class="tab-header">
+          <h2>Customer Segments & Targeted Personalization Actions</h2>
+          <p>Profiling customer behavior using Recency, Frequency, and Monetary (RFM) metrics to assign segment personas and marketing rules.</p>
+        </div>
+        <div id="profiles-grid" class="profiles-grid"></div>
+      </section>
+
+      <!-- VIEW 2: 2D PCA PROJECTION -->
+      <section id="pca-view" class="view-content">
+        <div class="tab-header">
+          <h2>🌌 2D PCA Cluster Feature Space</h2>
+          <p>Projects 6-dimensional RFM and behavioral feature vectors onto 2 principal components ($PC_1, PC_2$).</p>
+        </div>
+        <div class="card-full text-center">
+          <div class="pca-legend" id="pca-legend"></div>
+          <div class="canvas-wrapper">
+            <canvas id="pca-canvas" width="800" height="500"></canvas>
+          </div>
+          <div id="var-explained-text" class="var-text">Variance Explained: PC1 = 0%, PC2 = 0%</div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: REVENUE LIFT SIMULATION -->
+      <section id="revenue-view" class="view-content">
+        <div class="tab-header">
+          <h2>💰 Downstream Personalization Revenue Lift Simulation</h2>
+          <p>Simulates expected campaign conversion rates and revenue lift ($) of segment-targeted marketing vs a non-segmented generic baseline campaign.</p>
+        </div>
+        
+        <div class="card-full">
+          <div class="revenue-summary-grid">
+            <div class="rev-card"><h4>Baseline Campaign Revenue</h4><div class="rev-num" id="rev-base">$0</div></div>
+            <div class="rev-card"><h4>Segmented Campaign Revenue</h4><div class="rev-num highlight" id="rev-pers">$0</div></div>
+            <div class="rev-card"><h4>Total Revenue Lift ($)</h4><div class="rev-num success" id="rev-lift">$0</div></div>
+            <div class="rev-card"><h4>Revenue Lift (%)</h4><div class="rev-num success" id="rev-lift-pct">0%</div></div>
+          </div>
+
+          <h3 style="margin-top: 2rem;">Segment Campaign Breakdown</h3>
+          <div class="table-wrapper">
+            <table class="data-table" id="revenue-table">
+              <thead>
+                <tr>
+                  <th>Segment Persona</th>
+                  <th>Customer Count</th>
+                  <th>Baseline CR</th>
+                  <th>Personalized CR</th>
+                  <th>Baseline Revenue ($)</th>
+                  <th>Personalized Revenue ($)</th>
+                  <th>Revenue Lift ($)</th>
+                </tr>
+              </thead>
+              <tbody><!-- Populated dynamically --></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: CLUSTER VALIDATION (ELBOW & SILHOUETTE) -->
+      <section id="validation-view" class="view-content">
+        <div class="tab-header">
+          <h2>📈 Cluster Validation (Elbow WCSS Method & Silhouette Score)</h2>
+          <p>Evaluates Within-Cluster Sum of Squares (Inertia) and Silhouette Scores across $K \in [2 \dots 8]$ to choose the optimal number of segments.</p>
+        </div>
+        
+        <div class="card-full">
+          <button class="btn primary" onclick="loadValidationData()">🔄 Compute Validation Curves (K=2..8)</button>
+          <div id="val-loader" class="loader" style="display: none;">Computing Silhouette scores and WCSS for K=2..8...</div>
+
+          <div id="val-results" style="display: none; margin-top: 1.5rem;">
+            <div class="table-wrapper">
+              <table class="data-table" id="val-table">
+                <thead>
+                  <tr>
+                    <th>Clusters (K)</th>
+                    <th>WCSS / Inertia</th>
+                    <th>Silhouette Score</th>
+                    <th>Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody><!-- Populated dynamically --></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
